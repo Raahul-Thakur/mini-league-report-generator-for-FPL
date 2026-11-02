@@ -22,6 +22,8 @@ class Settings:
     # Cache TTLs (seconds). Static data changes rarely; GW data changes during live GWs.
     ttl_bootstrap: int = 3600
     ttl_default: int = 300
+    # Rendered PNG cards, keyed by (league, gw, format).
+    ttl_card: int = 300
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -32,4 +34,5 @@ class Settings:
             fpl_max_retries=_int("FPL_MAX_RETRIES", cls.fpl_max_retries),
             ttl_bootstrap=_int("TTL_BOOTSTRAP", cls.ttl_bootstrap),
             ttl_default=_int("TTL_DEFAULT", cls.ttl_default),
+            ttl_card=_int("TTL_CARD", cls.ttl_card),
         )

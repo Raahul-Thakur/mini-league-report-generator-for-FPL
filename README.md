@@ -16,8 +16,15 @@ app/
   models.py       report dataclasses
   service.py      fetches FPL data for a report, then calls report.py
   main.py         FastAPI app
+  card.py         renders a Report to a story/square PNG (Pillow)
+  text.py         font fallback per character, fit/shrink/ellipsis
+  branding.py     card colours, site name, handle, URL
+  assets/fonts/   bundled OFL fonts (see "Fonts" below)
 scripts/
-  check_live.py   one-off, hand-run check of live FPL response shapes
+  check_live.py      one-off, hand-run check of live FPL response shapes
+  render_samples.py  writes sample cards to samples/ from offline fixtures
+  build_fonts.py     regenerates app/assets/fonts from Google Fonts sources
+samples/          example cards, including edge cases (long, emoji, RTL, CJK names)
 tests/            fully offline (FakeFPL + httpx.MockTransport)
 ```
 
@@ -50,6 +57,13 @@ the latest started gameweek.
 | 422    | `invalid_gameweek`     | GW outside 1–38 |
 | 503    | `fpl_unavailable`      | FPL down or updating (`Retry-After: 120`) |
 
+`GET /api/leagues/{league_id}/card.png?gw=N&format=story|square&download=true`
+
+- `story` is 1080×1920 (default), `square` is 1080×1080
+- `download=true` sends `Content-Disposition: attachment`
+- rendered cards are cached in memory for `TTL_CARD` seconds, keyed by (league, gw, format)
+- errors are the same JSON as the report endpoint
+
 Leagues larger than `MAX_ENTRIES` are analysed for the top `MAX_ENTRIES` managers only,
 with `truncated: true` and `total_managers: null`. FPL doesn't expose a league's size,
 and we don't page through huge leagues just to count them.
@@ -79,6 +93,28 @@ Ties go to the manager higher in the league table.
 | `TTL_BOOTSTRAP` | `3600` | cache seconds for player/GW metadata |
 | `TTL_DEFAULT` | `300` | cache seconds for everything else |
 | `FPL_BASE_URL` | `https://fantasy.premierleague.com/api` | upstream base URL |
+| `TTL_CARD` | `300` | cache seconds for rendered cards |
+| `BRAND_SITE_NAME` | `Mini-League Report` | card watermark |
+| `BRAND_HANDLE` | `@your_handle` | card watermark |
+| `BRAND_SITE_URL` | `yoursite.com` | card call to action |
+| `BRAND_PRIMARY` | `#FF5A36` | card primary colour (GW pill, "bad" awards) |
+| `BRAND_ACCENT` | `#FFC83D` | card accent colour ("good" awards, URL) |
+
+## Fonts
+
+All bundled fonts are under the SIL Open Font License (licences in `app/assets/fonts/`):
+Space Grotesk (headings), Inter (body, Latin/Greek/Cyrillic), Noto Sans Arabic, Hebrew,
+Devanagari and Thai, Noto Emoji (monochrome), and Noto Sans SC/KR **subset** to common
+characters (GB2312 level 1, JIS level 1 kanji, kana, KS X 1001 Hangul) to keep the fonts
+under 6 MB in total.
+
+Names are drawn character by character with the first font that has a glyph. Stylised
+Unicode ("𝓕𝓪𝓷𝓬𝔂") is folded to plain letters. Characters no font covers (e.g. Georgian,
+rare CJK) are dropped rather than shown as boxes, and if nothing readable is left, the card
+shows the manager's name (or "Team <id>") instead. Long names shrink, then get an ellipsis.
+
+Arabic and Indic shaping needs Pillow's libraqm layout engine (bundled in the Pillow
+wheels; on slim Docker images also install `libfribidi0`).
 
 ## Being polite to FPL
 
