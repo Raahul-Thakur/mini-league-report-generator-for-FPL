@@ -106,7 +106,7 @@ All bundled fonts are under the SIL Open Font License (licences in `app/assets/f
 Space Grotesk (headings), Inter (body, Latin/Greek/Cyrillic), Noto Sans Arabic, Hebrew,
 Devanagari and Thai, Noto Emoji (monochrome), and Noto Sans SC/KR **subset** to common
 characters (GB2312 level 1, JIS level 1 kanji, kana, KS X 1001 Hangul) to keep the fonts
-under 6 MB in total.
+at about 6 MB in total.
 
 Names are drawn character by character with the first font that has a glyph. Stylised
 Unicode ("𝓕𝓪𝓷𝓬𝔂") is folded to plain letters. Characters no font covers (e.g. Georgian,
