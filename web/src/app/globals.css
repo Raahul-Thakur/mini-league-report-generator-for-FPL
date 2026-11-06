@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* Brand colours come from NEXT_PUBLIC_BRAND_* via inline vars on <html> (see layout.tsx). */
+:root {
+  --primary: #ff5a36;
+  --accent: #ffc83d;
+  --bg: #0e1116;
+  --surface: #181c24;
+  --surface-2: #222733;
+  --text: #f5f7fa;
+  --muted: #9aa4b2;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans",
+    "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background:
+    radial-gradient(60rem 30rem at 110% -10%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 70%),
+    radial-gradient(40rem 25rem at -20% 110%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
