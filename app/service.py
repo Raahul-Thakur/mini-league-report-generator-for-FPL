@@ -108,6 +108,7 @@ async def generate_report(
         live=live,
         picks_by_entry=picks_by_entry,
         truncated=truncated,
+        latest_gameweek=latest,
     )
 
 

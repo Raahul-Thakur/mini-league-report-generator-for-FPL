@@ -21,6 +21,7 @@ def test_report_defaults_to_current_gameweek():
     assert r.status_code == 200
     body = r.json()
     assert body["gameweek"] == CURRENT_GW and body["is_latest_gameweek"] is True
+    assert body["latest_gameweek"] == CURRENT_GW
     assert body["league_name"] == "Office Legends 🏆"
     assert body["winner"]["manager"]["entry_id"] == 104
     assert body["truncated"] is False and body["total_managers"] == 6
@@ -33,6 +34,7 @@ def test_past_gameweek_hides_rank_movers():
     with tc:
         body = tc.get(f"/api/leagues/{LEAGUE_ID}/report?gw={CURRENT_GW - 1}").json()
     assert body["is_latest_gameweek"] is False
+    assert body["latest_gameweek"] == CURRENT_GW
     assert body["rank_climber"] is None and body["rank_faller"] is None
 
 

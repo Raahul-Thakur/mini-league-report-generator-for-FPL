@@ -127,6 +127,7 @@ def build_report(
     live: Mapping,
     picks_by_entry: Mapping[int, Mapping],
     truncated: bool = False,
+    latest_gameweek: int | None = None,
 ) -> Report:
     stats = live_stats(live)
     # Managers without picks for this GW (e.g. joined FPL later) are skipped.
@@ -242,4 +243,6 @@ def build_report(
         differential_hero=differential,
         chips_played=chips,
         template=template,
+        latest_gameweek=latest_gameweek if latest_gameweek is not None
+        else (gameweek if is_latest_gameweek else None),
     )

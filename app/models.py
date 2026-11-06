@@ -91,6 +91,7 @@ class Report:
     differential_hero: DifferentialAward | None
     chips_played: list[ChipPlay] = field(default_factory=list)
     template: list[Ownership] = field(default_factory=list)
+    latest_gameweek: int | None = None  # newest GW with data, for GW pickers
 
     def to_dict(self) -> dict:
         return asdict(self)
