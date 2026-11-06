@@ -77,7 +77,7 @@ export function ReportView({ report: r }: { report: Report }) {
             </ul>
           </section>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:col-start-1">
+          <div className="grid gap-6 sm:grid-cols-2 lg:col-start-1 lg:grid-cols-1">
             <section aria-labelledby="chips-heading" className="rounded-3xl bg-surface/70 p-4 ring-1 ring-white/5">
               <h2 id="chips-heading" className="font-display text-xl">Chips played</h2>
               {r.chips_played.length ? (

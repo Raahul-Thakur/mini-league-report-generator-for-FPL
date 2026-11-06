@@ -37,12 +37,26 @@ test("paste an FPL league URL and get the latest report", async ({ page }) => {
   const card = page.getByRole("img", { name: /Story card for Office Legends/ });
   await expect(card).toBeVisible();
   await expect.poll(() => card.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1080);
+  await expect(page.getByText("Drawing your card…")).toBeHidden();
   await noHorizontalScroll(page);
 
   await expect.poll(() => events(page)).toContainEqual({
     event: "report_generated",
     opts: { props: { league_id: LEAGUE, gameweek: 10, managers: 6 } },
   });
+});
+
+test("card preview overlay clears even if the image loads before hydration", async ({ page }) => {
+  // Slow JS (as on a cheap phone in an in-app browser) so the server-rendered <img>
+  // finishes loading before React attaches onLoad.
+  await page.route("**/_next/static/chunks/**", async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.continue();
+  });
+  await page.goto(`/r/${LEAGUE}/10`);
+  const card = page.getByRole("img", { name: /Story card/ });
+  await expect.poll(() => card.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1080);
+  await expect(page.getByText("Drawing your card…")).toBeHidden({ timeout: 10_000 });
 });
 
 test("helper and validation on the landing page", async ({ page }) => {

@@ -38,9 +38,11 @@ npm test                               # unit tests (Vitest)
 PYTHON=$(cd .. && pwd)/.venv/bin/python npm run test:e2e
 ```
 
-E2E tests (Playwright) start the fake API and a production build themselves, and run in a
-desktop and an Instagram-in-app-browser mobile profile. First time locally:
-`npx playwright install chromium`.
+E2E tests (Playwright) start the fake API and a fresh production build themselves, and run in
+a desktop and an Instagram-in-app-browser mobile profile. First time locally:
+`npx playwright install chromium`. To iterate faster against servers you already started on
+ports 8100/3100, set `PW_REUSE=1`. It's off by default because a stale server silently tests
+old code.
 
 ## Analytics
 

@@ -130,6 +130,13 @@ export function CardPanel({ leagueId, gameweek, leagueName }: { leagueId: number
             key={src}
             src={src}
             alt={`${format === "story" ? "Story" : "Square"} card for ${leagueName}, gameweek ${gameweek}`}
+            // The image can finish loading before hydration attaches onLoad, so also
+            // check completeness when the element mounts.
+            ref={(img) => {
+              if (img?.complete && img.naturalWidth > 0 && !loaded[src]) {
+                setLoaded((l) => ({ ...l, [src]: true }));
+              }
+            }}
             onLoad={() => setLoaded((l) => ({ ...l, [src]: true }))}
             onError={() => setFailed(true)}
             className="size-full object-contain"
