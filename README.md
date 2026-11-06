@@ -20,8 +20,10 @@ app/
   text.py         font fallback per character, fit/shrink/ellipsis
   branding.py     card colours, site name, handle, URL
   assets/fonts/   bundled OFL fonts (see "Fonts" below)
+web/              Next.js frontend (see web/README.md)
 scripts/
   check_live.py      one-off, hand-run check of live FPL response shapes
+  fake_server.py     runs the API against offline fixture data (frontend dev + e2e tests)
   render_samples.py  writes sample cards to samples/ from offline fixtures
   build_fonts.py     regenerates app/assets/fonts from Google Fonts sources
 samples/          example cards, including edge cases (long, emoji, RTL, CJK names)
@@ -37,6 +39,10 @@ pytest
 uvicorn app.main:app --reload
 # http://localhost:8000/api/leagues/<league_id>/report?gw=<gw>
 ```
+
+Frontend: see [web/README.md](web/README.md). Quick start:
+`python -m scripts.fake_server` in one terminal, `cd web && npm install && npm run dev` in another,
+then open http://localhost:3000/r/424242.
 
 Check the live API shapes (makes a handful of real requests, run it by hand):
 
