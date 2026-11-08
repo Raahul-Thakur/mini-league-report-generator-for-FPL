@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
-// Where the FastAPI backend lives. The browser never talks to it directly:
-// /api/* on this site is proxied there, so there's no CORS and one public origin.
-const API_URL = (process.env.API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
+// The FastAPI backend (API_URL) is reached through src/app/api/leagues/[leagueId]/[resource]/route.ts,
+// which adds the internal key and the visitor's IP. The browser never calls it directly.
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
@@ -14,9 +13,6 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
-  },
-  async rewrites() {
-    return [{ source: "/api/:path*", destination: `${API_URL}/api/:path*` }];
   },
 };
 

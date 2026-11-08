@@ -168,3 +168,25 @@ test("footer disclaimer is on every page", async ({ page }) => {
     ).toBeVisible();
   }
 });
+
+test("API is only reachable through the site", async ({ request }) => {
+  // Direct call without the internal key is refused...
+  const direct = await request.get(`http://127.0.0.1:8100/api/leagues/${LEAGUE}/report`);
+  expect(direct.status()).toBe(403);
+  // ...while the site's proxy adds it.
+  const proxied = await request.get(`/api/leagues/${LEAGUE}/report?gw=10`);
+  expect(proxied.status()).toBe(200);
+  expect((await proxied.json()).league_name).toBe("Office Legends 🏆");
+});
+
+test("proxy only forwards the public endpoints", async ({ request }) => {
+  expect((await request.get(`/api/leagues/${LEAGUE}/secret`)).status()).toBe(404);
+  expect((await request.get(`/api/leagues/abc/report`)).status()).toBe(404);
+  const missing = await request.get(`/api/leagues/1/report`);
+  expect(missing.status()).toBe(404);
+  expect((await missing.json()).error).toBe("league_not_found");
+  expect(missing.headers()["cache-control"]).toBe("no-store");
+  const card = await request.get(`/api/leagues/${LEAGUE}/card.png?gw=10&format=square&download=true`);
+  expect(card.headers()["content-type"]).toBe("image/png");
+  expect(card.headers()["content-disposition"]).toMatch(/^attachment;/);
+});

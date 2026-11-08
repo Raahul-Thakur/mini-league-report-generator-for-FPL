@@ -61,6 +61,7 @@ export type ApiErrorCode =
   | "gameweek_not_started"
   | "invalid_gameweek"
   | "fpl_unavailable"
+  | "rate_limited"
   | "api_unreachable"
   | "unknown";
 

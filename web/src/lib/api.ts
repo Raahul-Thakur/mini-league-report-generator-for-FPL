@@ -1,14 +1,15 @@
 // Server-side access to the backend API. Never imported by client components.
+import { headers } from "next/headers";
 import { cache } from "react";
 import type { ApiErrorCode, ReportResult } from "./types";
-
-const API_URL = (process.env.API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
+import { API_URL, upstreamHeaders } from "./upstream";
 
 const FALLBACK_MESSAGES: Record<ApiErrorCode, string> = {
   league_not_found: "We couldn't find a classic league with that ID.",
   gameweek_not_started: "That gameweek hasn't started yet.",
   invalid_gameweek: "That isn't a valid gameweek.",
   fpl_unavailable: "The FPL API is busy or updating. Please try again in a few minutes.",
+  rate_limited: "You're going a bit fast. Please wait a minute and try again.",
   api_unreachable: "Our server didn't respond. Please try again in a moment.",
   unknown: "Something went wrong building this report.",
 };
@@ -24,7 +25,11 @@ export const getReport = cache(async (leagueId: number, gw?: number): Promise<Re
   const url = `${API_URL}/api/leagues/${leagueId}/report${gw ? `?gw=${gw}` : ""}`;
   let res: Response;
   try {
-    res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(60_000) });
+    res = await fetch(url, {
+      headers: upstreamHeaders(await headers()),
+      cache: "no-store",
+      signal: AbortSignal.timeout(60_000),
+    });
   } catch {
     return { ok: false, code: "api_unreachable", message: FALLBACK_MESSAGES.api_unreachable };
   }

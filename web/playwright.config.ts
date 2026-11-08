@@ -5,6 +5,10 @@ import { defineConfig, devices } from "@playwright/test";
 const PYTHON = process.env.PYTHON ?? "python3";
 // Reusing already-running servers is opt-in: a stale server silently tests old code.
 const reuse = process.env.PW_REUSE === "1";
+// Run with the production security setup: shared key, and limits high enough for the suite.
+const KEY = "e2e-internal-key";
+const API_ENV = `INTERNAL_API_KEY=${KEY} RATE_LIMIT_REPORT=1000/minute RATE_LIMIT_CARD=1000/minute`;
+const WEB_ENV = `API_URL=http://127.0.0.1:8100 INTERNAL_API_KEY=${KEY}`;
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -25,13 +29,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `cd .. && PORT=8100 exec ${PYTHON} -m scripts.fake_server`,
+      command: `cd .. && PORT=8100 ${API_ENV} exec ${PYTHON} -m scripts.fake_server`,
       url: "http://127.0.0.1:8100/api/health",
       reuseExistingServer: reuse,
     },
     {
       // exec so the server is the process Playwright stops (no orphaned next-server)
-      command: "API_URL=http://127.0.0.1:8100 npx next build && API_URL=http://127.0.0.1:8100 exec npx next start -p 3100",
+      command: `${WEB_ENV} npx next build && ${WEB_ENV} exec npx next start -p 3100`,
       url: "http://127.0.0.1:3100",
       timeout: 240_000,
       reuseExistingServer: reuse,
