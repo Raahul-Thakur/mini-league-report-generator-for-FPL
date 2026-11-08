@@ -1,7 +1,7 @@
 """Async client for the public FPL API.
 
 Politeness measures:
-- in-memory TTL cache, so repeat reports don't re-hit FPL
+- TTL cache (app/cache.py interface), so repeat reports don't re-hit FPL
 - identical in-flight requests are coalesced into one HTTP call
 - a semaphore caps concurrent requests
 - retries with exponential backoff on 429 / 5xx / network errors only
@@ -9,11 +9,11 @@ Politeness measures:
 from __future__ import annotations
 
 import asyncio
-import time
 from typing import Any
 
 import httpx
 
+from app.cache import Cache, MemoryCache
 from app.config import Settings
 
 USER_AGENT = "mini-league-report/0.1 (+unofficial fan tool)"
@@ -27,33 +27,13 @@ class FPLNotFound(FPLError):
     """FPL returned 404 (unknown league, entry or gameweek)."""
 
 
-class TTLCache:
-    def __init__(self) -> None:
-        self._data: dict[str, tuple[float, Any]] = {}
-
-    def get(self, key: str) -> Any | None:
-        item = self._data.get(key)
-        if item is None:
-            return None
-        expires, value = item
-        if time.monotonic() >= expires:
-            self._data.pop(key, None)
-            return None
-        return value
-
-    def set(self, key: str, value: Any, ttl: float) -> None:
-        self._data[key] = (time.monotonic() + ttl, value)
-
-    def clear(self) -> None:
-        self._data.clear()
-
-
 class FPLClient:
     def __init__(
         self,
         settings: Settings | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
         backoff_base: float = 0.5,
+        cache: Cache | None = None,
     ) -> None:
         self.settings = settings or Settings.from_env()
         self._http = httpx.AsyncClient(
@@ -63,7 +43,7 @@ class FPLClient:
             transport=transport,
             follow_redirects=True,
         )
-        self._cache = TTLCache()
+        self._cache: Cache = cache or MemoryCache(self.settings.fpl_cache_max_items)
         self._sem = asyncio.Semaphore(self.settings.fpl_concurrency)
         self._inflight: dict[str, asyncio.Future] = {}
         self._backoff_base = backoff_base
@@ -92,7 +72,7 @@ class FPLClient:
 
     async def _get(self, path: str, params: dict | None = None, ttl: float | None = None) -> Any:
         key = path + ("?" + "&".join(f"{k}={v}" for k, v in sorted(params.items())) if params else "")
-        cached = self._cache.get(key)
+        cached = await self._cache.get(key)
         if cached is not None:
             return cached
 
@@ -104,7 +84,7 @@ class FPLClient:
         self._inflight[key] = fut
         try:
             data = await self._fetch(path, params)
-            self._cache.set(key, data, ttl if ttl is not None else self.settings.ttl_default)
+            await self._cache.set(key, data, ttl if ttl is not None else self.settings.ttl_default)
             fut.set_result(data)
             return data
         except BaseException as exc:
