@@ -15,7 +15,8 @@ app/
   report.py       pure report engine (no I/O): FPL JSON in, Report out
   models.py       report dataclasses
   service.py      fetches FPL data for a report, then calls report.py
-  main.py         FastAPI app
+  main.py         FastAPI app: endpoints, internal key, rate limits, CORS
+  cache.py        Cache interface + in-memory LRU/TTL backend (swap in Redis here)
   card.py         renders a Report to a story/square PNG (Pillow)
   text.py         font fallback per character, fit/shrink/ellipsis
   branding.py     card colours, site name, handle, URL
@@ -28,6 +29,9 @@ scripts/
   build_fonts.py     regenerates app/assets/fonts from Google Fonts sources
 samples/          example cards, including edge cases (long, emoji, RTL, CJK names)
 tests/            fully offline (FakeFPL + httpx.MockTransport)
+Dockerfile        API image (Render, Railway, Fly, anywhere)
+render.yaml       Render Blueprint for the API
+.github/workflows/ci.yml   API tests, web lint/types/unit, e2e, Docker build
 ```
 
 ## Run locally
@@ -61,13 +65,15 @@ the latest started gameweek.
 | 404    | `league_not_found`     | no classic league with that ID |
 | 409    | `gameweek_not_started` | GW in the future, or pre-season |
 | 422    | `invalid_gameweek`     | GW outside 1–38 |
+| 403    | `forbidden`            | `INTERNAL_API_KEY` is set and the request didn't carry it |
+| 429    | `rate_limited`         | per-visitor rate limit hit (`Retry-After: 60`) |
 | 503    | `fpl_unavailable`      | FPL down or updating (`Retry-After: 120`) |
 
 `GET /api/leagues/{league_id}/card.png?gw=N&format=story|square&download=true`
 
 - `story` is 1080×1920 (default), `square` is 1080×1080
 - `download=true` sends `Content-Disposition: attachment`
-- rendered cards are cached in memory for `TTL_CARD` seconds, keyed by (league, gw, format)
+- rendered cards are cached for `TTL_CARD` seconds, keyed by (league, gw, format)
 - errors are the same JSON as the report endpoint
 
 Leagues larger than `MAX_ENTRIES` are analysed for the top `MAX_ENTRIES` managers only,
@@ -91,20 +97,78 @@ Ties go to the manager higher in the league table.
 
 ## Environment variables
 
+### API (Render)
+
 | Var | Default | Purpose |
 |---|---|---|
+| `INTERNAL_API_KEY` | *(empty)* | **Set in production.** Shared secret with the website. When set, `/api/leagues/*` requires `X-Internal-Key`, and only then is the website's `X-Client-IP` trusted for rate limiting. Must equal the website's `INTERNAL_API_KEY`. |
 | `MAX_ENTRIES` | `50` | free-tier cap on managers analysed per league |
+| `RATE_LIMIT_REPORT` | `30/minute` | per-visitor limit on report requests (empty = off) |
+| `RATE_LIMIT_CARD` | `120/minute` | per-visitor limit on card requests (empty = off) |
+| `RATE_LIMIT_STORAGE_URI` | `memory://` | `redis://…` to share limits across instances |
+| `CORS_ORIGINS` | *(empty)* | comma-separated browser origins allowed to call the API directly. Not needed: the website proxies server-side |
+| `CACHE_BACKEND` | `memory` | cache implementation (see `app/cache.py`) |
+| `FPL_CACHE_MAX_ITEMS` | `5000` | max cached FPL responses (LRU) |
+| `CARD_CACHE_MAX_ITEMS` | `300` | max cached card PNGs (~150–250 KB each) |
+| `TTL_BOOTSTRAP` | `3600` | cache seconds for player/GW metadata |
+| `TTL_DEFAULT` | `300` | cache seconds for other FPL data and report responses |
+| `TTL_CARD` | `300` | cache seconds for rendered cards |
 | `FPL_CONCURRENCY` | `5` | max concurrent requests to FPL |
 | `FPL_MAX_RETRIES` | `3` | retries on 429/5xx/network errors |
-| `TTL_BOOTSTRAP` | `3600` | cache seconds for player/GW metadata |
-| `TTL_DEFAULT` | `300` | cache seconds for everything else |
 | `FPL_BASE_URL` | `https://fantasy.premierleague.com/api` | upstream base URL |
-| `TTL_CARD` | `300` | cache seconds for rendered cards |
 | `BRAND_SITE_NAME` | `Mini-League Report` | card watermark |
 | `BRAND_HANDLE` | `@your_handle` | card watermark |
 | `BRAND_SITE_URL` | `yoursite.com` | card call to action |
 | `BRAND_PRIMARY` | `#FF5A36` | card primary colour (GW pill, "bad" awards) |
 | `BRAND_ACCENT` | `#FFC83D` | card accent colour ("good" awards, URL) |
+| `PORT` | `8000` | set by the platform |
+
+### Website (Vercel)
+
+| Var | Purpose |
+|---|---|
+| `API_URL` | the API's public URL, e.g. `https://mini-league-report-api.onrender.com` (server-side only) |
+| `INTERNAL_API_KEY` | same value as the API's (server-side only, never `NEXT_PUBLIC_`) |
+| `NEXT_PUBLIC_SITE_URL` | your site's URL, e.g. `https://yoursite.com` (absolute link-preview URLs) |
+| `NEXT_PUBLIC_SITE_NAME`, `NEXT_PUBLIC_INSTAGRAM_HANDLE` | header/footer branding |
+| `NEXT_PUBLIC_BRAND_PRIMARY`, `NEXT_PUBLIC_BRAND_ACCENT` | site colours (match the API's `BRAND_*`) |
+| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | enables Plausible analytics (empty = off) |
+| `NEXT_PUBLIC_PLAUSIBLE_SRC` | optional custom Plausible script URL |
+
+`NEXT_PUBLIC_*` values are baked in at build time, so redeploy after changing them.
+
+## Deploy
+
+```
+browser ──> Vercel (web/) ──server-side, with INTERNAL_API_KEY + visitor IP──> Render (API) ──> FPL API
+```
+
+1. **Generate a key:** `openssl rand -hex 32` (or let Render generate one in step 2).
+2. **API on Render:** New → Blueprint → this repo. `render.yaml` creates a Docker web
+   service with a health check. In its Environment tab, note the generated
+   `INTERNAL_API_KEY` and fill in the `BRAND_*` values. Check
+   `https://<service>.onrender.com/api/health` returns `{"ok":true}`.
+3. **Website on Vercel:** New Project → this repo → **Root Directory: `web`** (framework
+   is detected). Add the website env vars above, with `INTERNAL_API_KEY` equal to Render's.
+   Deploy.
+4. **Domain:** add it in Vercel (Settings → Domains), then set `NEXT_PUBLIC_SITE_URL` and
+   the API's `BRAND_SITE_URL` to it and redeploy both.
+5. **Smoke test:** open `https://yoursite.com/r/<your league id>`, save a card, and paste
+   the link into WhatsApp to check the preview. Direct calls to
+   `https://<service>.onrender.com/api/leagues/1/report` should return 403.
+
+**Railway / Fly / any Docker host:** the same `Dockerfile` works; set the API env vars
+there and point the website's `API_URL` at it.
+
+### Scaling notes
+
+- Run **one instance with one worker** to start with: the cache and rate-limit counters are
+  in-process. Before adding instances, add a Redis `Cache` in `app/cache.py` (`CACHE_BACKEND`)
+  and point `RATE_LIMIT_STORAGE_URI` at Redis.
+- Report and card responses carry `s-maxage`, so Vercel's CDN can serve repeat views
+  without reaching the API.
+- Rendering a card takes ~0.1–0.2 s of CPU; a cold report for a 50-manager league makes
+  about 53 FPL requests (capped at 5 concurrent), so expect a few seconds on first view.
 
 ## Fonts
 

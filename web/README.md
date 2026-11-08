@@ -11,8 +11,12 @@ visitors arrive from Instagram's in-app browser.
 | `/r/{leagueId}` | Redirects to the latest gameweek |
 | `/r/{leagueId}/{gw}` | Awards, share card preview, save story/post, copy/share link, GW selector. `og:image` is the square card |
 
-`/api/*` is proxied to the FastAPI backend (`API_URL`), so the browser only ever talks to
-this site: no CORS, and Open Graph image URLs live on your domain.
+`/api/leagues/{id}/report` and `/api/leagues/{id}/card.png` on this site are a route handler
+(`src/app/api/leagues/[leagueId]/[resource]/route.ts`) that forwards to the FastAPI backend
+(`API_URL`), adding the shared `INTERNAL_API_KEY` and the visitor's IP so the API can rate-limit
+per visitor. The browser only ever talks to this site: no CORS, and Open Graph image URLs live
+on your domain. `vercel.json` pins server functions to Frankfurt (`fra1`) to sit next to the
+API; change it if you host the API elsewhere.
 
 ## Develop
 
@@ -43,6 +47,10 @@ a desktop and an Instagram-in-app-browser mobile profile. First time locally:
 `npx playwright install chromium`. To iterate faster against servers you already started on
 ports 8100/3100, set `PW_REUSE=1`. It's off by default because a stale server silently tests
 old code.
+
+## Deploy
+
+See the root README's **Deploy** section. On Vercel, set **Root Directory** to `web`.
 
 ## Analytics
 
